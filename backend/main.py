@@ -173,6 +173,25 @@ async def planner_node(state: AgentState) -> dict:
         ]
         return {"plan": plan}
 
+    if mode == "news_intelligence":
+        plan = [
+            f"site:reuters.com {query}",
+            f"site:techcrunch.com {query}",
+            f"site:bloomberg.com {query} market impact",
+            f"site:ft.com {query} business analysis",
+            f"{query} market implications latest 2025",
+        ]
+        return {"plan": plan}
+
+    if mode == "tech_stack":
+        plan = [
+            f"site:github.com {query} architecture stack",
+            f"{query} best framework comparison 2025",
+            f"{query} production tech stack real world",
+            f"{query} vs alternatives performance trade-offs",
+        ]
+        return {"plan": plan}
+
     # fact_check — LLM-decomposed plan
     prompt = (
         f"Break down this query into a 3-step research plan. "
@@ -389,12 +408,111 @@ async def _synthesize_debate(state: AgentState) -> dict:
     return {"verified_report": json.dumps(debate)}
 
 
+async def _synthesize_news(state: AgentState) -> dict:
+    """Categorise news results into market impact, tech developments, sources."""
+    results   = state.get("research_results", {})
+    query     = state.get("query", "")
+    all_links = extract_links_from_results(results)
+    all_points = extract_key_points(results)
+
+    market_domains = ["bloomberg", "ft.com", "reuters", "wsj", "finance", "investing", "marketwatch"]
+    tech_domains   = ["techcrunch", "wired", "arstechnica", "theverge", "ycombinator", "venturebeat"]
+
+    market_links = [l for l in all_links if any(d in l["url"] for d in market_domains)][:3]
+    tech_links   = [l for l in all_links if any(d in l["url"] for d in tech_domains)][:3]
+
+    snippets = [l["snippet"] for l in all_links if l.get("snippet")][:3]
+    summary  = " ".join(snippets)[:400] if snippets else f"Aggregated intelligence on: {query}."
+
+    # Extract unique publisher domains as key players
+    key_players = list({
+        l["url"].split("/")[2].replace("www.", "")
+        for l in all_links if l.get("url") and "/" in l["url"]
+    })[:6]
+
+    news = {
+        "mode": "news_intelligence",
+        "topic": query,
+        "summary": summary,
+        "market_impact": [
+            {"title": l["title"], "url": l["url"], "snippet": l.get("snippet", "")}
+            for l in (market_links or all_links[:2])
+        ],
+        "tech_developments": [
+            {"title": l["title"], "url": l["url"], "snippet": l.get("snippet", "")}
+            for l in (tech_links or all_links[2:4])
+        ],
+        "key_players": key_players,
+        "what_to_watch": [p[:150] for p in all_points[:3]] if all_points else [
+            f"Monitor regulatory responses to {query}",
+            "Track competitor and market leader reactions",
+            "Watch for downstream supply chain or pricing effects",
+        ],
+        "sources": [{"title": l["title"], "url": l["url"]} for l in all_links[:5]],
+    }
+    return {"verified_report": json.dumps(news)}
+
+
+async def _synthesize_tech_stack(state: AgentState) -> dict:
+    """Detect technology mentions in search results and build a stack recommendation."""
+    results    = state.get("research_results", {})
+    query      = state.get("query", "")
+    all_links  = extract_links_from_results(results)
+    all_points = extract_key_points(results)
+    full_text  = " ".join(results.values()).lower()
+
+    FRONTEND = ["react", "next.js", "nextjs", "vue", "nuxt", "angular", "svelte", "remix", "astro"]
+    BACKEND  = ["fastapi", "django", "express", "nestjs", "rails", "spring", "gin", "fiber", "hono", "flask", "actix"]
+    DATABASE = ["postgresql", "postgres", "mongodb", "redis", "mysql", "supabase", "planetscale",
+                "sqlite", "lancedb", "pinecone", "qdrant", "weaviate", "neon"]
+    INFRA    = ["vercel", "railway", "fly.io", "aws", "gcp", "azure", "docker", "kubernetes",
+                "render", "cloudflare", "netlify"]
+
+    def find_mentions(tech_list: list) -> list:
+        return [t for t in tech_list if t in full_text]
+
+    frontend_hits = find_mentions(FRONTEND)
+    backend_hits  = find_mentions(BACKEND)
+    db_hits       = find_mentions(DATABASE)
+    infra_hits    = find_mentions(INFRA)
+
+    github_links = [{"title": l["title"], "url": l["url"]}
+                    for l in all_links if "github.com" in l.get("url", "")][:3]
+
+    stack = {
+        "mode": "tech_stack",
+        "use_case": query,
+        "recommended": {
+            "frontend": frontend_hits[:2] if frontend_hits else ["Next.js"],
+            "backend":  backend_hits[:2]  if backend_hits  else ["FastAPI"],
+            "database": db_hits[:2]       if db_hits       else ["PostgreSQL"],
+            "infra":    infra_hits[:2]    if infra_hits    else ["Vercel + Railway"],
+        },
+        "reasoning": [p[:150] for p in all_points[:4]] if all_points else [
+            "Match stack maturity to team size — managed services reduce ops burden early.",
+            "Typed API contracts (FastAPI OpenAPI, tRPC) prevent frontend/backend drift.",
+            "Prefer postgres-compatible DBs for relational data; add vector store only when needed.",
+        ],
+        "avoid": [
+            "Microservices before product-market fit — monolith first, split on bottleneck.",
+            "Choosing technology for hype over ecosystem maturity and hiring pool.",
+        ],
+        "starter_resources": github_links,
+        "sources_scanned": len(all_links),
+    }
+    return {"verified_report": json.dumps(stack)}
+
+
 async def synthesizer_node(state: AgentState) -> dict:
     mode = state.get("mode", "fact_check")
     if mode == "deep_curation":
         return await _synthesize_curation(state)
     if mode == "debate":
         return await _synthesize_debate(state)
+    if mode == "news_intelligence":
+        return await _synthesize_news(state)
+    if mode == "tech_stack":
+        return await _synthesize_tech_stack(state)
     return await _synthesize_fact_check(state)
 
 

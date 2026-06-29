@@ -72,6 +72,26 @@ const DebaterAgainstNode = ({ data }: NodeProps<Node<LabelData>>) => (
   </div>
 );
 
+// news_intelligence reporters — orange
+const NewsReporterNode = ({ data }: NodeProps<Node<LabelData>>) => (
+  <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-orange-400 min-w-[160px]">
+    <Handle type="target" position={Position.Top} id="target" />
+    <div className="font-bold text-xs text-orange-600 uppercase mb-1">📰 Reporter</div>
+    <div className="font-semibold text-sm text-center">{data.label}</div>
+    <Handle type="source" position={Position.Bottom} id="source" />
+  </div>
+);
+
+// tech_stack advisors — teal
+const TechAdvisorNode = ({ data }: NodeProps<Node<LabelData>>) => (
+  <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-teal-400 min-w-[160px]">
+    <Handle type="target" position={Position.Top} id="target" />
+    <div className="font-bold text-xs text-teal-600 uppercase mb-1">🧪 Scanner</div>
+    <div className="font-semibold text-sm text-center">{data.label}</div>
+    <Handle type="source" position={Position.Bottom} id="source" />
+  </div>
+);
+
 const AuditorNode = ({ data }: NodeProps<Node<LabelData>>) => (
   <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-amber-300 min-w-[180px]">
     <Handle type="target" position={Position.Top} id="target" />
@@ -105,6 +125,8 @@ export default function DiscoveryTree({ nodes, edges, setNodes, setEdges }: Disc
     curator:          CuratorNode,
     debater_for:      DebaterForNode,
     debater_against:  DebaterAgainstNode,
+    news_reporter:    NewsReporterNode,
+    tech_advisor:     TechAdvisorNode,
     auditor:          AuditorNode,
     synthesizer:      SynthesizerNode,
   }), []);

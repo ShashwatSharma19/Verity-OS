@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-export type Mode = 'fact_check' | 'deep_curation' | 'debate';
+export type Mode = 'fact_check' | 'deep_curation' | 'debate' | 'news_intelligence' | 'tech_stack';
 
 interface ModeSelectorProps {
   mode: Mode;
@@ -28,6 +28,18 @@ const MODES: { id: Mode; icon: string; label: string; description: string }[] = 
     icon: '⚔',
     label: 'Debate',
     description: 'Steel-man both sides of any topic with sourced arguments',
+  },
+  {
+    id: 'news_intelligence',
+    icon: '📰',
+    label: 'News',
+    description: 'Market & tech news with impact analysis — finance, startups, macro trends',
+  },
+  {
+    id: 'tech_stack',
+    icon: '🧪',
+    label: 'Tech Stack',
+    description: 'Get a tailored tech stack recommendation based on your use case',
   },
 ];
 

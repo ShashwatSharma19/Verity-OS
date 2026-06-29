@@ -35,6 +35,38 @@ interface DebateData {
   verdict: string;
 }
 
+interface NewsItem {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+interface NewsData {
+  mode: 'news_intelligence';
+  topic: string;
+  summary: string;
+  market_impact: NewsItem[];
+  tech_developments: NewsItem[];
+  key_players: string[];
+  what_to_watch: string[];
+  sources: NewsItem[];
+}
+
+interface TechStackData {
+  mode: 'tech_stack';
+  use_case: string;
+  recommended: {
+    frontend: string[];
+    backend: string[];
+    database: string[];
+    infra: string[];
+  };
+  reasoning: string[];
+  avoid: string[];
+  starter_resources: { title: string; url: string }[];
+  sources_scanned: number;
+}
+
 interface SynthesisReportProps {
   report: string;
   calibrationScore: number | null;
@@ -247,22 +279,187 @@ function DebateReport({ data, calibrationScore }: { data: DebateData; calibratio
   );
 }
 
+// ── News Intelligence view ───────────────────────────────────────────────────
+
+function NewsLink({ item }: { item: NewsItem }) {
+  return (
+    <li className="flex items-start gap-2">
+      <span className="text-slate-300 text-xs mt-1">▸</span>
+      <div className="min-w-0">
+        {item.url ? (
+          <a href={item.url} target="_blank" rel="noopener noreferrer"
+            className="text-sm font-medium text-blue-600 hover:underline break-words">
+            {item.title}
+          </a>
+        ) : (
+          <span className="text-sm font-medium text-slate-700">{item.title}</span>
+        )}
+        {item.snippet && (
+          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+            {item.snippet.slice(0, 120)}{item.snippet.length > 120 ? '…' : ''}
+          </p>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function NewsReport({ data }: { data: NewsData }) {
+  return (
+    <div className="absolute bottom-4 right-4 bg-white shadow-2xl rounded-xl max-w-md w-full border border-slate-200 z-50 flex flex-col max-h-[75vh]">
+      <ReportHeader icon="📰" title="News Intelligence" subtitle={data.topic}
+        badge="Market + Tech" badgeColor="bg-orange-100 text-orange-700" />
+
+      {/* Summary strip */}
+      <div className="mx-4 mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg flex-shrink-0">
+        <p className="text-xs text-slate-600 leading-relaxed">{data.summary}</p>
+      </div>
+
+      <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+        {data.market_impact?.length > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-sm">💹</span>
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Market Impact</span>
+            </div>
+            <ul className="space-y-2">{data.market_impact.map((item, i) => <NewsLink key={i} item={item} />)}</ul>
+          </div>
+        )}
+
+        {data.tech_developments?.length > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-sm">⚡</span>
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Tech Developments</span>
+            </div>
+            <ul className="space-y-2">{data.tech_developments.map((item, i) => <NewsLink key={i} item={item} />)}</ul>
+          </div>
+        )}
+
+        {data.what_to_watch?.length > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-sm">👁</span>
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">What to Watch</span>
+            </div>
+            <ul className="space-y-1">
+              {data.what_to_watch.map((w, i) => (
+                <li key={i} className="text-xs text-slate-600 leading-relaxed flex gap-1.5">
+                  <span className="text-orange-400 font-bold">•</span>{w}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {data.key_players?.length > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-sm">🏢</span>
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Key Players</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {data.key_players.map((p, i) => (
+                <span key={i} className="text-xs px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full">{p}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Tech Stack Advisor view ───────────────────────────────────────────────────
+
+const STACK_LAYERS: { key: keyof TechStackData['recommended']; icon: string; label: string; color: string }[] = [
+  { key: 'frontend', icon: '🖥',  label: 'Frontend',  color: 'bg-blue-50 border-blue-200 text-blue-800' },
+  { key: 'backend',  icon: '⚙️',  label: 'Backend',   color: 'bg-green-50 border-green-200 text-green-800' },
+  { key: 'database', icon: '🗄',  label: 'Database',  color: 'bg-purple-50 border-purple-200 text-purple-800' },
+  { key: 'infra',    icon: '☁️',  label: 'Infra',     color: 'bg-orange-50 border-orange-200 text-orange-800' },
+];
+
+function TechStackReport({ data }: { data: TechStackData }) {
+  return (
+    <div className="absolute bottom-4 right-4 bg-white shadow-2xl rounded-xl max-w-md w-full border border-slate-200 z-50 flex flex-col max-h-[75vh]">
+      <ReportHeader icon="🧪" title="Tech Stack Recommendation" subtitle={data.use_case}
+        badge={`${data.sources_scanned} sources`} badgeColor="bg-teal-100 text-teal-700" />
+
+      {/* Stack grid */}
+      <div className="grid grid-cols-2 gap-2 px-4 pt-3 flex-shrink-0">
+        {STACK_LAYERS.map(({ key, icon, label, color }) => (
+          <div key={key} className={`p-2.5 rounded-lg border ${color}`}>
+            <div className="text-xs font-bold uppercase mb-1">{icon} {label}</div>
+            {data.recommended[key].map((t, i) => (
+              <div key={i} className="text-xs font-semibold">{t}</div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+        {data.reasoning?.length > 0 && (
+          <div>
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">💡 Why This Stack</div>
+            <ul className="space-y-1.5">
+              {data.reasoning.map((r, i) => (
+                <li key={i} className="text-xs text-slate-600 leading-relaxed flex gap-1.5">
+                  <span className="text-teal-500 font-bold shrink-0">•</span>{r}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {data.avoid?.length > 0 && (
+          <div>
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">⚠️ Avoid</div>
+            <ul className="space-y-1.5">
+              {data.avoid.map((a, i) => (
+                <li key={i} className="text-xs text-red-600 leading-relaxed flex gap-1.5">
+                  <span className="font-bold shrink-0">✕</span>{a}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {data.starter_resources?.length > 0 && (
+          <div>
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">⬛ Starter Repos</div>
+            <ul className="space-y-1.5">
+              {data.starter_resources.map((r, i) => (
+                <li key={i}>
+                  <a href={r.url} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline break-words">
+                    {r.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Root component — auto-detects mode from report payload ────────────────────
 
 export default function SynthesisReport({ report, calibrationScore }: SynthesisReportProps) {
   if (!report) return null;
 
-  let parsed: (CurationData | DebateData) | null = null;
+  let parsed: (CurationData | DebateData | NewsData | TechStackData) | null = null;
   try {
-    parsed = JSON.parse(report) as CurationData | DebateData;
+    parsed = JSON.parse(report) as CurationData | DebateData | NewsData | TechStackData;
   } catch {
     // Not JSON — render as fact_check markdown
   }
 
-  if (parsed?.mode === 'deep_curation')
-    return <CurationReport data={parsed as CurationData} calibrationScore={calibrationScore} />;
-  if (parsed?.mode === 'debate')
-    return <DebateReport data={parsed as DebateData} calibrationScore={calibrationScore} />;
+  if (parsed?.mode === 'deep_curation')     return <CurationReport data={parsed as CurationData} calibrationScore={calibrationScore} />;
+  if (parsed?.mode === 'debate')            return <DebateReport data={parsed as DebateData} calibrationScore={calibrationScore} />;
+  if (parsed?.mode === 'news_intelligence') return <NewsReport data={parsed as NewsData} />;
+  if (parsed?.mode === 'tech_stack')        return <TechStackReport data={parsed as TechStackData} />;
 
   return <FactCheckReport report={report} calibrationScore={calibrationScore} />;
 }
