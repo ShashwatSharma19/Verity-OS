@@ -192,6 +192,26 @@ async def planner_node(state: AgentState) -> dict:
         ]
         return {"plan": plan}
 
+    if mode == "person_intelligence":
+        plan = [
+            f'"{query}" background career profile biography',
+            f'"{query}" site:linkedin.com OR site:crunchbase.com',
+            f'"{query}" site:github.com projects contributions',
+            f'"{query}" news interviews statements 2025',
+            f'"{query}" achievements impact notable work',
+        ]
+        return {"plan": plan}
+
+    if mode == "learning_path":
+        plan = [
+            f"{query} complete roadmap beginner to advanced 2025",
+            f"site:github.com {query} learning curriculum resources",
+            f"{query} best books courses tutorials",
+            f"{query} hands-on projects portfolio ideas",
+            f"{query} prerequisites what to learn first",
+        ]
+        return {"plan": plan}
+
     # fact_check — LLM-decomposed plan
     prompt = (
         f"Break down this query into a 3-step research plan. "
@@ -503,16 +523,106 @@ async def _synthesize_tech_stack(state: AgentState) -> dict:
     return {"verified_report": json.dumps(stack)}
 
 
+async def _synthesize_person_intel(state: AgentState) -> dict:
+    """Aggregate public information about a person or company."""
+    results   = state.get("research_results", {})
+    query     = state.get("query", "")
+    all_links = extract_links_from_results(results)
+    all_points = extract_key_points(results)
+
+    profile_domains = ["linkedin.com", "crunchbase.com", "bloomberg.com", "forbes.com"]
+    social_domains  = ["github.com", "twitter.com", "x.com", "medium.com", "substack.com"]
+    news_domains    = ["techcrunch.com", "reuters.com", "wired.com", "theverge.com", "ft.com"]
+
+    profile_links = [l for l in all_links if any(d in l["url"] for d in profile_domains)][:2]
+    social_links  = [l for l in all_links if any(d in l["url"] for d in social_domains)][:3]
+    news_links    = [l for l in all_links if any(d in l["url"] for d in news_domains)][:3]
+
+    snippets = sorted([l["snippet"] for l in all_links if l.get("snippet")], key=len, reverse=True)
+    summary  = snippets[0][:400] if snippets else f"Intelligence report on: {query}."
+    key_facts = [p[:150] for p in all_points[:5]] if all_points else [
+        f"Multiple public sources reference {query}.",
+        "Cross-reference with LinkedIn or Crunchbase for verified details.",
+    ]
+
+    profile = {
+        "mode":                 "person_intelligence",
+        "subject":              query,
+        "summary":              summary,
+        "key_facts":            key_facts,
+        "professional_profiles": [{"title": l["title"], "url": l["url"], "snippet": l.get("snippet", "")} for l in (profile_links or all_links[:2])],
+        "online_presence":      [{"title": l["title"], "url": l["url"]} for l in (social_links or all_links[2:4])],
+        "recent_coverage":      [{"title": l["title"], "url": l["url"], "snippet": l.get("snippet", "")} for l in (news_links or all_links[4:6])],
+        "sources_scanned":      len(all_links),
+    }
+    return {"verified_report": json.dumps(profile)}
+
+
+async def _synthesize_learning_path(state: AgentState) -> dict:
+    """Build a 3-phase structured learning path from search results."""
+    results    = state.get("research_results", {})
+    query      = state.get("query", "")
+    all_links  = extract_links_from_results(results)
+    all_points = extract_key_points(results)
+    full_text  = " ".join(results.values()).lower()
+
+    course_domains = ["coursera", "udemy", "edx", "pluralsight", "freecodecamp",
+                      "khanacademy", "youtube", "linkedin.com/learning", "egghead"]
+    github_links   = [l for l in all_links if "github.com" in l.get("url", "")][:4]
+    course_links   = [l for l in all_links if any(d in l["url"] for d in course_domains)][:3]
+    doc_links      = [l for l in all_links if any(d in l["url"] for d in ["docs.", "readthedocs", "developer.", "wiki"])][:2]
+
+    prereq_hints  = [p for p in all_points if any(w in p.lower() for w in ["prerequisite", "before", "first", "basic", "foundation"])][:3]
+    project_hints = [p for p in all_points if any(w in p.lower() for w in ["project", "build", "create", "implement", "practice"])][:3]
+
+    third = max(1, len(all_links) // 3)
+
+    path = {
+        "mode":  "learning_path",
+        "topic": query,
+        "phases": [
+            {
+                "name":      "Foundation",
+                "duration":  "2–4 weeks",
+                "goal":      f"Understand core concepts and fundamentals of {query}",
+                "resources": [{"title": l["title"], "url": l["url"]} for l in (course_links or all_links[:third])[:3]],
+            },
+            {
+                "name":      "Intermediate",
+                "duration":  "4–8 weeks",
+                "goal":      f"Build real projects and deepen understanding",
+                "resources": [{"title": l["title"], "url": l["url"]} for l in (doc_links + all_links[third:third * 2])[:3]],
+            },
+            {
+                "name":      "Advanced",
+                "duration":  "8–12 weeks",
+                "goal":      f"Master advanced patterns and contribute to the ecosystem",
+                "resources": [{"title": l["title"], "url": l["url"]} for l in (github_links or all_links[third * 2:])[:3]],
+            },
+        ],
+        "prerequisites": prereq_hints if prereq_hints else [
+            "Basic programming fundamentals",
+            "Comfort with the command line",
+        ],
+        "projects": project_hints if project_hints else [
+            f"Build a small end-to-end {query} project from scratch",
+            f"Contribute to an open-source {query} repository",
+            f"Recreate a real-world {query} use case with your own data",
+        ],
+        "key_resources":   [{"title": l["title"], "url": l["url"]} for l in all_links[:5]],
+        "sources_scanned": len(all_links),
+    }
+    return {"verified_report": json.dumps(path)}
+
+
 async def synthesizer_node(state: AgentState) -> dict:
     mode = state.get("mode", "fact_check")
-    if mode == "deep_curation":
-        return await _synthesize_curation(state)
-    if mode == "debate":
-        return await _synthesize_debate(state)
-    if mode == "news_intelligence":
-        return await _synthesize_news(state)
-    if mode == "tech_stack":
-        return await _synthesize_tech_stack(state)
+    if mode == "deep_curation":     return await _synthesize_curation(state)
+    if mode == "debate":            return await _synthesize_debate(state)
+    if mode == "news_intelligence": return await _synthesize_news(state)
+    if mode == "tech_stack":        return await _synthesize_tech_stack(state)
+    if mode == "person_intelligence": return await _synthesize_person_intel(state)
+    if mode == "learning_path":     return await _synthesize_learning_path(state)
     return await _synthesize_fact_check(state)
 
 
