@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-export type Mode = 'fact_check' | 'deep_curation' | 'debate' | 'news_intelligence' | 'tech_stack';
+export type Mode = 'fact_check' | 'deep_curation' | 'debate' | 'news_intelligence' | 'tech_stack' | 'person_intelligence' | 'learning_path';
 
 interface ModeSelectorProps {
   mode: Mode;
@@ -40,6 +40,18 @@ const MODES: { id: Mode; icon: string; label: string; description: string }[] = 
     icon: '🧪',
     label: 'Tech Stack',
     description: 'Get a tailored tech stack recommendation based on your use case',
+  },
+  {
+    id: 'person_intelligence',
+    icon: '🔍',
+    label: 'Intel',
+    description: 'Research public figures and companies — founders, executives, startups. Public sources only.',
+  },
+  {
+    id: 'learning_path',
+    icon: '🎓',
+    label: 'Learn',
+    description: 'Get a structured 3-phase learning path for any skill or technology',
   },
 ];
 
