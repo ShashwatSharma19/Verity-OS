@@ -67,6 +67,40 @@ interface TechStackData {
   sources_scanned: number;
 }
 
+interface ProfileLink {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+interface PersonIntelData {
+  mode: 'person_intelligence';
+  subject: string;
+  summary: string;
+  key_facts: string[];
+  professional_profiles: ProfileLink[];
+  online_presence: { title: string; url: string }[];
+  recent_coverage: ProfileLink[];
+  sources_scanned: number;
+}
+
+interface LearningPhase {
+  name: string;
+  duration: string;
+  goal: string;
+  resources: { title: string; url: string }[];
+}
+
+interface LearningPathData {
+  mode: 'learning_path';
+  topic: string;
+  phases: LearningPhase[];
+  prerequisites: string[];
+  projects: string[];
+  key_resources: { title: string; url: string }[];
+  sources_scanned: number;
+}
+
 interface SynthesisReportProps {
   report: string;
   calibrationScore: number | null;
@@ -444,22 +478,188 @@ function TechStackReport({ data }: { data: TechStackData }) {
   );
 }
 
+// ── Person / Company Intelligence view ───────────────────────────────────────
+
+function PersonIntelReport({ data }: { data: PersonIntelData }) {
+  return (
+    <div className="absolute bottom-4 right-4 bg-white shadow-2xl rounded-xl max-w-md w-full border border-slate-200 z-50 flex flex-col max-h-[75vh]">
+      <ReportHeader icon="🔍" title={data.subject} subtitle="Intelligence Report"
+        badge={`${data.sources_scanned} sources`} badgeColor="bg-indigo-100 text-indigo-700" />
+
+      {/* Legal disclaimer */}
+      <div className="mx-4 mt-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg flex-shrink-0">
+        <p className="text-xs text-yellow-800 leading-snug">
+          ⚠️ Results aggregated from publicly indexed sources only. Accuracy is not guaranteed — always verify before acting on this information.
+        </p>
+      </div>
+
+      {/* Summary */}
+      <div className="mx-4 mt-2 p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex-shrink-0">
+        <p className="text-xs text-slate-700 leading-relaxed">{data.summary}</p>
+      </div>
+
+      <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+        {/* Key facts */}
+        {data.key_facts?.length > 0 && (
+          <div>
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">📌 Key Facts</div>
+            <ul className="space-y-1.5">
+              {data.key_facts.map((f, i) => (
+                <li key={i} className="text-xs text-slate-600 leading-relaxed flex gap-1.5">
+                  <span className="text-indigo-400 font-bold shrink-0">•</span>{f}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Professional profiles */}
+        {data.professional_profiles?.length > 0 && (
+          <div>
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">👤 Profiles</div>
+            <ul className="space-y-2">
+              {data.professional_profiles.map((l, i) => (
+                <li key={i}>
+                  <a href={l.url} target="_blank" rel="noopener noreferrer"
+                    className="text-sm font-medium text-blue-600 hover:underline break-words">{l.title}</a>
+                  {l.snippet && <p className="text-xs text-slate-500 mt-0.5">{l.snippet.slice(0, 100)}…</p>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Online presence */}
+        {data.online_presence?.length > 0 && (
+          <div>
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">🌐 Online Presence</div>
+            <div className="flex flex-wrap gap-2">
+              {data.online_presence.map((l, i) => (
+                <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
+                  className="text-xs px-2.5 py-1 bg-slate-100 text-blue-600 rounded-full hover:underline">
+                  {l.title.slice(0, 30)}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recent coverage */}
+        {data.recent_coverage?.length > 0 && (
+          <div>
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">📰 Recent Coverage</div>
+            <ul className="space-y-2">
+              {data.recent_coverage.map((l, i) => (
+                <li key={i}>
+                  <a href={l.url} target="_blank" rel="noopener noreferrer"
+                    className="text-sm font-medium text-blue-600 hover:underline break-words">{l.title}</a>
+                  {l.snippet && <p className="text-xs text-slate-500 mt-0.5">{l.snippet.slice(0, 100)}…</p>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Learning Path view ────────────────────────────────────────────────────────
+
+const PHASE_COLORS = [
+  { bg: 'bg-green-50', border: 'border-green-200', label: 'text-green-700', dot: 'bg-green-400' },
+  { bg: 'bg-blue-50',  border: 'border-blue-200',  label: 'text-blue-700',  dot: 'bg-blue-400'  },
+  { bg: 'bg-purple-50',border: 'border-purple-200',label: 'text-purple-700',dot: 'bg-purple-400'},
+];
+
+function LearningPathReport({ data }: { data: LearningPathData }) {
+  return (
+    <div className="absolute bottom-4 right-4 bg-white shadow-2xl rounded-xl max-w-lg w-full border border-slate-200 z-50 flex flex-col max-h-[80vh]">
+      <ReportHeader icon="🎓" title={`Learn: ${data.topic}`}
+        badge={`${data.sources_scanned} sources`} badgeColor="bg-yellow-100 text-yellow-700" />
+
+      <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+        {/* 3 phases */}
+        {data.phases?.map((phase, i) => {
+          const c = PHASE_COLORS[i] ?? PHASE_COLORS[2];
+          return (
+            <div key={i} className={`p-3 rounded-lg border ${c.bg} ${c.border}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-xs font-bold uppercase ${c.label}`}>
+                  Phase {i + 1} — {phase.name}
+                </span>
+                <span className="text-xs text-slate-500">{phase.duration}</span>
+              </div>
+              <p className="text-xs text-slate-600 mb-2 leading-relaxed">{phase.goal}</p>
+              {phase.resources?.length > 0 && (
+                <ul className="space-y-1">
+                  {phase.resources.map((r, j) => (
+                    <li key={j} className="flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />
+                      {r.url ? (
+                        <a href={r.url} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline truncate">{r.title}</a>
+                      ) : (
+                        <span className="text-xs text-slate-600">{r.title}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Prerequisites */}
+        {data.prerequisites?.length > 0 && (
+          <div>
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">🔑 Prerequisites</div>
+            <ul className="space-y-1">
+              {data.prerequisites.map((p, i) => (
+                <li key={i} className="text-xs text-slate-600 flex gap-1.5">
+                  <span className="text-yellow-500 font-bold shrink-0">•</span>{p}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Project ideas */}
+        {data.projects?.length > 0 && (
+          <div>
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">🛠 Project Ideas</div>
+            <ul className="space-y-1">
+              {data.projects.map((p, i) => (
+                <li key={i} className="text-xs text-slate-600 flex gap-1.5">
+                  <span className="text-slate-400 font-bold shrink-0">{i + 1}.</span>{p}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Root component — auto-detects mode from report payload ────────────────────
 
 export default function SynthesisReport({ report, calibrationScore }: SynthesisReportProps) {
   if (!report) return null;
 
-  let parsed: (CurationData | DebateData | NewsData | TechStackData) | null = null;
+  let parsed: (CurationData | DebateData | NewsData | TechStackData | PersonIntelData | LearningPathData) | null = null;
   try {
-    parsed = JSON.parse(report) as CurationData | DebateData | NewsData | TechStackData;
+    parsed = JSON.parse(report) as CurationData | DebateData | NewsData | TechStackData | PersonIntelData | LearningPathData;
   } catch {
     // Not JSON — render as fact_check markdown
   }
 
-  if (parsed?.mode === 'deep_curation')     return <CurationReport data={parsed as CurationData} calibrationScore={calibrationScore} />;
-  if (parsed?.mode === 'debate')            return <DebateReport data={parsed as DebateData} calibrationScore={calibrationScore} />;
-  if (parsed?.mode === 'news_intelligence') return <NewsReport data={parsed as NewsData} />;
-  if (parsed?.mode === 'tech_stack')        return <TechStackReport data={parsed as TechStackData} />;
+  if (parsed?.mode === 'deep_curation')       return <CurationReport data={parsed as CurationData} calibrationScore={calibrationScore} />;
+  if (parsed?.mode === 'debate')              return <DebateReport data={parsed as DebateData} calibrationScore={calibrationScore} />;
+  if (parsed?.mode === 'news_intelligence')   return <NewsReport data={parsed as NewsData} />;
+  if (parsed?.mode === 'tech_stack')          return <TechStackReport data={parsed as TechStackData} />;
+  if (parsed?.mode === 'person_intelligence') return <PersonIntelReport data={parsed as PersonIntelData} />;
+  if (parsed?.mode === 'learning_path')       return <LearningPathReport data={parsed as LearningPathData} />;
 
   return <FactCheckReport report={report} calibrationScore={calibrationScore} />;
 }

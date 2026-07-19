@@ -134,7 +134,7 @@ All agent nodes call `llm.ainvoke(messages)` — nothing else changes.
 |-------|-------|--------|
 | 1 | Fact Check · Deep Curation · Debate | ✅ Complete |
 | 2 | News Intelligence · Tech Stack Advisor | ✅ Complete |
-| 3 | Person / Company Intelligence · Learning Path Builder | Planned |
+| 3 | Person / Company Intelligence · Learning Path Builder | ✅ Complete |
 | 4 | Real LLM integration · token log-prob calibration | Pending API key |
 | 5 | Redis-backed persistent state · multi-session support | Planned |
 
