@@ -72,6 +72,26 @@ const DebaterAgainstNode = ({ data }: NodeProps<Node<LabelData>>) => (
   </div>
 );
 
+// person_intelligence agents — indigo
+const IntelAgentNode = ({ data }: NodeProps<Node<LabelData>>) => (
+  <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-indigo-400 min-w-[160px]">
+    <Handle type="target" position={Position.Top} id="target" />
+    <div className="font-bold text-xs text-indigo-600 uppercase mb-1">🔍 Intel</div>
+    <div className="font-semibold text-sm text-center">{data.label}</div>
+    <Handle type="source" position={Position.Bottom} id="source" />
+  </div>
+);
+
+// learning_path scouts — yellow
+const LearnScoutNode = ({ data }: NodeProps<Node<LabelData>>) => (
+  <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-yellow-400 min-w-[160px]">
+    <Handle type="target" position={Position.Top} id="target" />
+    <div className="font-bold text-xs text-yellow-600 uppercase mb-1">🎓 Scout</div>
+    <div className="font-semibold text-sm text-center">{data.label}</div>
+    <Handle type="source" position={Position.Bottom} id="source" />
+  </div>
+);
+
 // news_intelligence reporters — orange
 const NewsReporterNode = ({ data }: NodeProps<Node<LabelData>>) => (
   <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-orange-400 min-w-[160px]">
@@ -127,6 +147,8 @@ export default function DiscoveryTree({ nodes, edges, setNodes, setEdges }: Disc
     debater_against:  DebaterAgainstNode,
     news_reporter:    NewsReporterNode,
     tech_advisor:     TechAdvisorNode,
+    intel_agent:      IntelAgentNode,
+    learn_scout:      LearnScoutNode,
     auditor:          AuditorNode,
     synthesizer:      SynthesizerNode,
   }), []);
