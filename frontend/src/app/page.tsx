@@ -15,8 +15,10 @@ function getNodeType(step: string, mode: Mode): string {
     return step.startsWith('FOR:') ? 'debater_for' : 'debater_against';
   }
   if (mode === 'deep_curation')     return 'curator';
-  if (mode === 'news_intelligence') return 'news_reporter';
-  if (mode === 'tech_stack')        return 'tech_advisor';
+  if (mode === 'news_intelligence')   return 'news_reporter';
+  if (mode === 'tech_stack')          return 'tech_advisor';
+  if (mode === 'person_intelligence') return 'intel_agent';
+  if (mode === 'learning_path')       return 'learn_scout';
   return 'explorer';
 }
 
@@ -46,6 +48,21 @@ function formatNodeLabel(step: string, mode: Mode): string {
     if (step.includes('alternatives'))    return '🔀 Alternatives';
     return '🧪 Stack';
   }
+  if (mode === 'person_intelligence') {
+    if (step.includes('linkedin') || step.includes('crunchbase')) return '👤 Profile';
+    if (step.includes('github'))      return '⬛ GitHub';
+    if (step.includes('news') || step.includes('interviews'))     return '📰 News';
+    if (step.includes('achievements')) return '🏆 Achievements';
+    return '🔍 Intel';
+  }
+  if (mode === 'learning_path') {
+    if (step.includes('roadmap'))      return '🗺 Roadmap';
+    if (step.includes('site:github')) return '⬛ GitHub';
+    if (step.includes('books') || step.includes('courses')) return '📚 Courses';
+    if (step.includes('projects'))     return '🛠 Projects';
+    if (step.includes('prerequisites')) return '🔑 Prerequisites';
+    return '🎓 Resources';
+  }
   return step.slice(0, 50) + (step.length > 50 ? '…' : '');
 }
 
@@ -53,8 +70,10 @@ const EXAMPLE_QUERIES: Record<Mode, string[]> = {
   fact_check:        ['Is GPT-4 better than Claude 3?', 'Does caffeine improve cognitive performance?'],
   deep_curation:     ['best vector databases for RAG 2025', 'LLM quantization techniques'],
   debate:            ['Is remote work more productive?', 'Should AI be open source?'],
-  news_intelligence: ['AI chips market impact 2025', 'OpenAI market strategy latest'],
-  tech_stack:        ['real-time chat app 100k users', 'AI document search system'],
+  news_intelligence:   ['AI chips market impact 2025', 'OpenAI market strategy latest'],
+  tech_stack:          ['real-time chat app 100k users', 'AI document search system'],
+  person_intelligence: ['Sam Altman OpenAI', 'Anthropic AI company'],
+  learning_path:       ['machine learning from scratch', 'system design for engineers'],
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -132,7 +151,7 @@ export default function AppDashboard() {
           const auditorNode: Node = {
             id: 'auditor', type: 'auditor',
             position: { x: 400, y: currentYRef.current },
-            data: { label: mode === 'debate' ? 'Argument Auditor' : mode === 'deep_curation' ? 'Source Curator' : mode === 'news_intelligence' ? 'News Aggregator' : mode === 'tech_stack' ? 'Stack Analyzer' : 'CoVe Auditor' },
+            data: { label: mode === 'debate' ? 'Argument Auditor' : mode === 'deep_curation' ? 'Source Curator' : mode === 'news_intelligence' ? 'News Aggregator' : mode === 'tech_stack' ? 'Stack Analyzer' : mode === 'person_intelligence' ? 'Profile Aggregator' : mode === 'learning_path' ? 'Resource Collector' : 'CoVe Auditor' },
           };
           const explorerEdges: Edge[] = explorerIdsRef.current.map(id => ({
             id: `e-${id}-auditor`, source: id, sourceHandle: 'source',
@@ -148,7 +167,7 @@ export default function AppDashboard() {
           const synthNode: Node = {
             id: 'synthesizer', type: 'synthesizer',
             position: { x: 400, y: currentYRef.current },
-            data: { label: mode === 'deep_curation' ? 'Curator' : mode === 'debate' ? 'Debate Engine' : mode === 'news_intelligence' ? 'News Brief' : mode === 'tech_stack' ? 'Stack Report' : 'Synthesizer' },
+            data: { label: mode === 'deep_curation' ? 'Curator' : mode === 'debate' ? 'Debate Engine' : mode === 'news_intelligence' ? 'News Brief' : mode === 'tech_stack' ? 'Stack Report' : mode === 'person_intelligence' ? 'Intel Report' : mode === 'learning_path' ? 'Learning Path' : 'Synthesizer' },
           };
           setNodes(nds => [...nds, synthNode]);
           setEdges(eds => [...eds, {
@@ -191,11 +210,13 @@ export default function AppDashboard() {
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Input
             placeholder={
-              mode === 'fact_check'        ? 'Enter a claim or question to fact-check…' :
-              mode === 'deep_curation'     ? 'What topic do you want expert resources for?' :
-              mode === 'news_intelligence' ? 'Any market, tech or business topic…' :
-              mode === 'tech_stack'        ? 'Describe your app or use case…' :
-                                            'Enter any topic to debate both sides…'
+              mode === 'fact_check'          ? 'Enter a claim or question to fact-check…' :
+              mode === 'deep_curation'       ? 'What topic do you want expert resources for?' :
+              mode === 'news_intelligence'   ? 'Any market, tech or business topic…' :
+              mode === 'tech_stack'          ? 'Describe your app or use case…' :
+              mode === 'person_intelligence' ? 'Enter a public figure or company name…' :
+              mode === 'learning_path'       ? 'What skill or technology do you want to learn?' :
+                                              'Enter any topic to debate both sides…'
             }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
