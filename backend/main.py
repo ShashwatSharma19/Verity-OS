@@ -5,12 +5,25 @@ import asyncio
 import operator
 from typing import Dict, List, TypedDict, Annotated
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
+
+try:
+    from langchain_groq import ChatGroq
+    _groq_key = os.environ.get("GROQ_API_KEY", "")
+    if _groq_key:
+        _real_llm = ChatGroq(model="llama-3.1-70b-versatile", temperature=0, api_key=_groq_key)
+    else:
+        _real_llm = None
+except ImportError:
+    _real_llm = None
 
 from core.search_mcp import BraveSearchMCP
 from core.toulmin_logic import analyze_document_reasoning
@@ -115,7 +128,7 @@ class MockLLM:
         return AIMessage(content="Acknowledged. Proceeding with available context.")
 
 
-llm = MockLLM()
+llm = _real_llm if _real_llm is not None else MockLLM()
 
 # ---------------------------------------------------------------------------
 # FastAPI
@@ -214,21 +227,23 @@ async def planner_node(state: AgentState) -> dict:
 
     # fact_check — LLM-decomposed plan
     prompt = (
-        f"Break down this query into a 3-step research plan. "
-        f"query: {query}. Return ONLY a valid JSON list of strings."
+        "You are a research planner. Decompose the query below into exactly 3 targeted "
+        "web-search sub-queries that together cover the topic comprehensively.\n\n"
+        f"Query: {query}\n\n"
+        "Rules:\n"
+        "- Return ONLY a JSON array of 3 strings, nothing else.\n"
+        "- No numbering, no explanation, no markdown fences.\n"
+        "- Each string is a search query (under 80 chars).\n"
+        'Example: ["sub-query one", "sub-query two", "sub-query three"]'
     )
     response = await llm.ainvoke([HumanMessage(content=prompt)])
     try:
-        plan = json.loads(response.content)
-        if not isinstance(plan, list):
+        raw = re.sub(r'^```(?:json)?\s*', '', response.content.strip(), flags=re.IGNORECASE)
+        raw = re.sub(r'\s*```$', '', raw.strip()).strip()
+        plan = json.loads(raw)
+        if not isinstance(plan, list) or len(plan) == 0:
             raise ValueError
-        clean = []
-        for step in plan:
-            for marker in ["Return ONLY", "JSON list", "valid JSON"]:
-                if marker in step:
-                    step = step[:step.index(marker)].strip().rstrip(".")
-            clean.append(str(step))
-        plan = clean
+        plan = [str(s).strip() for s in plan if str(s).strip()]
     except (json.JSONDecodeError, ValueError):
         plan = [
             f"Define core concepts for: {query[:60]}",
@@ -279,12 +294,23 @@ async def auditor_generate_questions_node(state: AgentState) -> dict:
     if state.get("mode", "fact_check") != "fact_check":
         return {"verification_questions": []}
 
-    prompt = f"Read this draft and generate 3 verification questions:\n\n{state.get('draft_report', '')}"
+    prompt = (
+        "You are a fact-checking auditor. Read the draft research report below and generate "
+        "exactly 3 sharp verification questions that probe the weakest or most questionable claims.\n\n"
+        f"Draft report:\n{state.get('draft_report', '')}\n\n"
+        "Rules:\n"
+        "- Return ONLY a JSON array of 3 question strings, nothing else.\n"
+        "- No numbering, no explanation, no markdown fences.\n"
+        'Example: ["Question one?", "Question two?", "Question three?"]'
+    )
     response = await llm.ainvoke([HumanMessage(content=prompt)])
     try:
-        questions = json.loads(response.content)
-        if not isinstance(questions, list):
+        raw = re.sub(r'^```(?:json)?\s*', '', response.content.strip(), flags=re.IGNORECASE)
+        raw = re.sub(r'\s*```$', '', raw.strip()).strip()
+        questions = json.loads(raw)
+        if not isinstance(questions, list) or len(questions) == 0:
             raise ValueError
+        questions = [str(q).strip() for q in questions if str(q).strip()]
     except (json.JSONDecodeError, ValueError):
         questions = [
             "Are sources technically credible?",
@@ -303,10 +329,13 @@ async def auditor_verify_answers_node(state: AgentState) -> dict:
         return {"verified_report": state.get("draft_report", ""), "calibration_score": calibration}
 
     questions    = state.get("verification_questions", [])
-    raw_evidence = str(state.get("research_results", {}))
+    raw_evidence = str(state.get("research_results", {}))[:6000]   # hard cap to stay in context
     prompt = (
-        "Answer these verification questions using ONLY the provided evidence. "
-        f"Questions: {questions}. Evidence: {raw_evidence}"
+        "You are a fact-checking auditor. Answer each verification question below using ONLY "
+        "the provided evidence. Do NOT use prior knowledge or make anything up.\n\n"
+        f"Verification questions:\n{json.dumps(questions, indent=2)}\n\n"
+        f"Evidence (from web search):\n{raw_evidence}\n\n"
+        "For each question, write: 'Q: <question>\\nA: <answer based solely on the evidence above>.'"
     )
     response = await llm.ainvoke([HumanMessage(content=prompt)])
     return {"verified_report": response.content, "calibration_score": calibration}
@@ -319,14 +348,26 @@ async def auditor_verify_answers_node(state: AgentState) -> dict:
 async def _synthesize_fact_check(state: AgentState) -> dict:
     """Toulmin-structured report with MISSING_EVIDENCE circuit breaker."""
     verified = state.get("verified_report", "")
+    query    = state.get("query", "")
     prompt = (
-        "Synthesize a final report using the Toulmin Model format. "
-        "Return ONLY valid JSON with keys: claim, grounds (list), warrant, "
-        "backing (list), rebuttal, qualifier. "
-        f"Verified report: {verified}"
+        "You are a research synthesiser. Using the verified evidence below, write a structured "
+        "argument following the Toulmin Model.\n\n"
+        f"Research query: {query}\n\n"
+        f"Verified evidence:\n{verified[:4000]}\n\n"
+        "Return ONLY a valid JSON object with exactly these keys — no markdown fences, no extra text:\n"
+        "{\n"
+        '  "claim": "A single clear sentence stating the answer to the query",\n'
+        '  "grounds": ["Fact 1 from evidence", "Fact 2 from evidence", "Fact 3 from evidence"],\n'
+        '  "warrant": "One sentence: why the grounds logically lead to the claim",\n'
+        '  "backing": ["Supporting context 1", "Supporting context 2"],\n'
+        '  "rebuttal": "One sentence: known limitation or exception",\n'
+        '  "qualifier": "Likely | Highly likely | Uncertain | Confirmed"\n'
+        "}"
     )
     response = await llm.ainvoke([HumanMessage(content=prompt)])
-    toulmin  = analyze_document_reasoning(response.content)
+    raw_content = re.sub(r'^```(?:json)?\s*', '', response.content.strip(), flags=re.IGNORECASE)
+    raw_content = re.sub(r'\s*```$', '', raw_content.strip()).strip()
+    toulmin  = analyze_document_reasoning(raw_content)
 
     if toulmin["status"] != "SUCCESS":
         final = (
